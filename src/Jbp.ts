@@ -17,12 +17,14 @@ export class Jbp<T extends JbpData> {
         this.id = json.AssetId;
         this._data = json.Data;
         this.meta = json.Meta;
+        this.isShadowDeleted = json.Meta?.ShadowDeleted || false;
     }
 
     private _data: T;
 
     public id: Id;
     public meta: {ShadowDeleted?: boolean;}
+    public isShadowDeleted: boolean;
 
     public get data() {
         return typeof this._data === 'object' ? this._data : null;
