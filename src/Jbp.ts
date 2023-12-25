@@ -1,12 +1,18 @@
 import {Id} from './types';
 
+interface JbpBaseStructure<T extends JbpData> {
+    AssetId: Id;
+    Data: T;
+    Meta: {ShadowDeleted?: boolean};
+}
+
 export type JbpData = {
     $type: `${string}, ${string}`;
 }
 
 export class Jbp<T extends JbpData> {
     constructor(str: string) {
-        const json = JSON.parse(str);
+        const json: JbpBaseStructure<T> = JSON.parse(str);
 
         this.id = json.AssetId;
         this._data = json.Data;
@@ -16,7 +22,7 @@ export class Jbp<T extends JbpData> {
     private _data: T;
 
     public id: Id;
-    public meta: { ShadowDeleted?: boolean; }
+    public meta: {ShadowDeleted?: boolean;}
 
     public get data() {
         return typeof this._data === 'object' ? this._data : null;
