@@ -1,10 +1,8 @@
-import {readdir, readFile} from 'fs/promises';
-import {extname} from 'path';
-import {ArchetypeNames, ArchetypeItem, ArchetypeItemNames, Languages, PureDictionaryItem} from './types';
-import {
-    getClassItemNameFromPath, getChildFromPath, getClassItemFromFileName,
-    getFilenameFromPath, isInstance, isJsonFile, isPureItem
-} from './utils/utils';
+import {readdir, readFile, writeFile} from 'fs/promises';
+import {Id} from './types';
+import {isJbpFile} from './utils';
+import {SerializedClassItem, JbpClass} from './JbpClass';
+import {JbpEncyclopedia, SerializedEncyclopediaItem} from './JbpEncyclopedia';
 
 // 1. parseEncyclopedia
 // 2. parseClasses
@@ -23,45 +21,92 @@ import {
 // 5. добавить тесты на проверку всех сущностей на сторонние символы [_ / \ {g } и т.д.]
 
 
-export const parse = async () => {
-    const dir = '/Users/newton-goloto/Documents/_dev/Mechanics/Blueprints/Classes';
-    const map = new Map<string, ArchetypeItem>();
-    const idArray = [];
-    const allRelativeFilePaths = await readdir(dir, {recursive: true});
+export const parseClasses = async () => {
+    const classesDir = '/Users/newton-goloto/Documents/_dev/Blueprints/Classes';
+    const map = new Map<Id, SerializedClassItem>();
+    const set = new Set<string>();
+    const allRelativeFilePaths = await readdir(classesDir, {recursive: true});
+    const localizationString = await readFile('/Users/newton-goloto/Documents/_dev/wrtbp/ruRU.json', {encoding: 'utf-8'});
+    const localization = JSON.parse(localizationString);
 
-    for (const relativeFilePath of allRelativeFilePaths) {
-        if (!isJsonFile(relativeFilePath)) {
-            break;
+    for (let i = 0; i < allRelativeFilePaths.length; i++) {
+        const relativeFilePath = allRelativeFilePaths[i];
+
+        if (!isJbpFile(relativeFilePath)) {
+            continue;
         }
 
-        const path = `${dir}/${relativeFilePath}`;
-        const fileName = getFilenameFromPath(relativeFilePath);
-        const folder = getChildFromPath(relativeFilePath, 0);
+        const path = `${classesDir}/${relativeFilePath}`;
         const fileContent = await readFile(path, {encoding: 'utf-8'});
-        const json = JSON.parse(fileContent) as PureDictionaryItem;
 
-        if (!isPureItem(json)) {
-            break;
+        const jbpClass = new JbpClass(fileContent, relativeFilePath);
+
+        if (!jbpClass.isCorrectClass) {
+            continue;
         }
 
-        if (isInstance(folder, ArchetypeNames)) {
-            const name = getClassItemFromFileName(fileName);
-            const item = {
-                ...json,
-                name,
-                class: directories[0],
-                type: getClassItemNameFromPath(directories[1]),
-                languages: json.languages.filter((lang) => lang.locale === Languages.English || lang.locale === Languages.Russian)
-            };
-            console.log('______item', JSON.stringify(item));
-            map.set(name, item);
-
-            idArray.push(json.key);
+        if (!jbpClass.haveTranslation()) {
+            continue;
         }
+
+        if (!localization?.strings?.[jbpClass.descriptionId] && !localization?.strings?.[jbpClass.titleId]) {
+            set.add(`${jbpClass.id} - ${jbpClass.meta?.ShadowDeleted}`);
+        }
+
+        map.set(jbpClass.id, jbpClass.serialize());
+        // set.add(jbpClass.type);
     }
 
-    // console.log(`idArray: ${JSON.stringify(idArray)}`)
-    console.log(`idArray.length: ${idArray.length}`)
+    console.log(`classes items count: ${map.size}`);
+    console.log('classes non-localized items count', set.size);
+    console.log('classes non-localized items', Array.from(set));
+
+    await writeFile(`./output/class-items-${(new Date()).toISOString()}.json`, JSON.stringify(Object.fromEntries(map)), 'utf8');
 }
 
+export const parseEncyclopedia = async () => {
+    const encyclopediaDir = '/Users/newton-goloto/Documents/_dev/Blueprints/Encyclopedia';
+    const map = new Map<Id, SerializedEncyclopediaItem>();
+    const set = new Set();
+    const allRelativeFilePaths = await readdir(encyclopediaDir, {recursive: true});
+    const localizationString = await readFile('/Users/newton-goloto/Documents/_dev/wrtbp/ruRU.json', {encoding: 'utf-8'});
+    const localization = JSON.parse(localizationString);
 
+    for (let i = 0; i < allRelativeFilePaths.length; i++) {
+        const relativeFilePath = allRelativeFilePaths[i];
+
+        if (!isJbpFile(relativeFilePath)) {
+            continue;
+        }
+
+        const path = `${encyclopediaDir}/${relativeFilePath}`;
+        const fileContent = await readFile(path, {encoding: 'utf-8'});
+
+        const encyclopediaItem = new JbpEncyclopedia(fileContent, relativeFilePath);
+
+        if (!encyclopediaItem.isCorrectEncyclopediaType) {
+            continue;
+        }
+
+        if (!encyclopediaItem.haveTranslation()) {
+            continue;
+        }
+
+        if (!localization?.strings?.[encyclopediaItem.descriptionId] && !localization?.strings?.[encyclopediaItem.titleId]) {
+            set.add(`${encyclopediaItem.id} - ${encyclopediaItem.meta?.ShadowDeleted}`);
+        }
+
+        map.set(encyclopediaItem.id, encyclopediaItem.serialize());
+        // set.add(encyclopediaItem.type);
+    }
+
+    console.log(`encyclopedia items count: ${map.size}`);
+    console.log('encyclopedia non-localized items count', set.size);
+    console.log('encyclopedia non-localized items', Array.from(set));
+
+    await writeFile(`./output/encyclopedia-items-${(new Date()).toISOString()}.json`, JSON.stringify(Object.fromEntries(map)), 'utf8');
+}
+
+// парсим энциклопедию
+
+// парсим файл локализации, сравниваем его с предыдущими и выкидываем все лишние строки

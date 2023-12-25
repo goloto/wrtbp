@@ -1,5 +1,6 @@
-import {parse} from './src'
+import {parseClasses, parseEncyclopedia} from './src'
 
-await parse();
+await parseClasses();
+await parseEncyclopedia();
 
 export {}
