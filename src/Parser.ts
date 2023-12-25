@@ -11,20 +11,24 @@ interface LocalizationItem {
 
 export class Parser {
     constructor() {
-        this.localization = new Map();
+        this.fullLocalization = new Map();
+        this.liteLocalization = new Map();
         this.classes = new Map();
         this.encyclopedia = new Map();
+        this.encyclopediaLinksReferences = new Map();
     }
 
-    public localization: Map<Id, LocalizationItem>;
+    public fullLocalization: Map<Id, LocalizationItem>;
+    public liteLocalization: Map<Id, string>;
     public classes: Map<Id, SerializedClassItem>;
     public encyclopedia: Map<Id, SerializedEncyclopediaItem>;
+    public encyclopediaLinksReferences: Map<string, {titleId: Id; descriptionId: Id;}>;
 
     public async parseLocalization(filePath: string) {
         const localizationString = await readFile(filePath, {encoding: 'utf-8'});
         const localization: {strings: Record<Id, LocalizationItem>} = JSON.parse(localizationString).strings;
 
-        this.localization = new Map(Object.entries(localization));
+        this.fullLocalization = new Map(Object.entries(localization));
     }
 
     public async parseClasses(dir: string) {
@@ -55,11 +59,13 @@ export class Parser {
                 continue;
             }
 
-            if (!this.localization.has(jbpClass.descriptionId) && !this.localization.has(jbpClass.titleId)) {
+            if (!this.fullLocalization.has(jbpClass.descriptionId) || !this.fullLocalization.has(jbpClass.titleId)) {
                 missingLocalizationItems.add(jbpClass.id);
                 continue;
             }
 
+            this.liteLocalization.set(jbpClass.descriptionId, this.fullLocalization.get(jbpClass.descriptionId).Text);
+            this.liteLocalization.set(jbpClass.titleId, this.fullLocalization.get(jbpClass.titleId).Text);
             this.classes.set(jbpClass.id, jbpClass.serialize());
         }
 
@@ -95,11 +101,13 @@ export class Parser {
                 continue;
             }
 
-            if (!this.localization.has(encyclopediaItem.descriptionId) && !this.localization.has(encyclopediaItem.titleId)) {
+            if (!this.fullLocalization.has(encyclopediaItem.descriptionId) || !this.fullLocalization.has(encyclopediaItem.titleId)) {
                 missingLocalizationItems.add(encyclopediaItem.id);
                 continue;
             }
 
+            this.liteLocalization.set(encyclopediaItem.descriptionId, this.fullLocalization.get(encyclopediaItem.descriptionId).Text);
+            this.liteLocalization.set(encyclopediaItem.titleId, this.fullLocalization.get(encyclopediaItem.titleId).Text);
             this.encyclopedia.set(encyclopediaItem.id, encyclopediaItem.serialize());
         }
 
